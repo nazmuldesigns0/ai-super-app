@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { SUPPORTED_MODELS } from "@/lib/gemini";
+import { SUPPORTED_MODELS } from "@/lib/models";
 
 const INITIAL_MODELS = SUPPORTED_MODELS.map((m) => ({
   id: m.id,

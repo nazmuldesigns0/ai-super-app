@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { authenticateRequest } from "@/lib/server-auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { isMailerConfigured, sendMail, verificationCodeEmail } from "@/lib/mailer";
 
@@ -40,6 +41,15 @@ export async function POST(req: NextRequest) {
   const action = body?.action;
 
   if (action === "send") {
+    // Bounds e-mail abuse (a runaway client or script cannot spam codes).
+    const limited = enforceRateLimit(req, {
+      limit: 5,
+      windowMs: 10 * 60 * 1000,
+      userId: auth.userId,
+      message: "Too many verification e-mails requested. Please wait a few minutes.",
+    });
+    if (limited) return limited;
+
     const now = Date.now();
     const previous = lastSentAt.get(auth.userId) || 0;
     if (now - previous < RESEND_COOLDOWN_MS) {

@@ -8,6 +8,58 @@ import { formatBytes } from "@/lib/utils";
 // Max 10MB limit in bytes
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+const readFileAsDataUrl = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
+/**
+ * Validates and converts a list of dropped/selected files into attachments.
+ * Shared by the file picker and the drag-and-drop drop zone.
+ */
+export async function filesToAttachments(
+  files: FileList | File[]
+): Promise<{ attachments: Attachment[]; error: string | null }> {
+  const list = Array.from(files);
+  const newAttachments: Attachment[] = [];
+  const oversizedFiles: string[] = [];
+
+  for (const file of list) {
+    // Strict 10MB Validation
+    if (file.size > MAX_FILE_SIZE) {
+      oversizedFiles.push(`${file.name} (${formatBytes(file.size)})`);
+      continue;
+    }
+
+    // Convert to base64 for instant preview and prompt transmission
+    try {
+      const base64Data = await readFileAsDataUrl(file);
+      newAttachments.push({
+        url: base64Data,
+        data: base64Data,
+        name: file.name,
+        type: file.type || "application/octet-stream",
+        size: file.size,
+      });
+    } catch (err) {
+      console.error("Failed to read file", file.name, err);
+    }
+  }
+
+  const error =
+    oversizedFiles.length > 0
+      ? `The following file(s) exceed the 10MB limit: ${oversizedFiles.join(
+          ", "
+        )}. Please select smaller files.`
+      : null;
+
+  return { attachments: newAttachments, error };
+}
+
 interface FileUploadProps {
   attachments: Attachment[];
   onAddAttachments: (newAttachments: Attachment[]) => void;
@@ -29,56 +81,15 @@ export function FileUploadButton({
     if (!files || files.length === 0) return;
 
     setErrorMessage(null);
-    const newAttachments: Attachment[] = [];
-    const oversizedFiles: string[] = [];
+    const { attachments: newAttachments, error } = await filesToAttachments(files);
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-
-      // Strict 10MB Validation
-      if (file.size > MAX_FILE_SIZE) {
-        oversizedFiles.push(`${file.name} (${formatBytes(file.size)})`);
-        continue;
-      }
-
-      // Convert to base64 for instant preview and prompt transmission
-      try {
-        const base64Data = await readFileAsDataUrl(file);
-        newAttachments.push({
-          url: base64Data,
-          data: base64Data,
-          name: file.name,
-          type: file.type || "application/octet-stream",
-          size: file.size,
-        });
-      } catch (err) {
-        console.error("Failed to read file", file.name, err);
-      }
-    }
-
-    if (oversizedFiles.length > 0) {
-      setErrorMessage(
-        `The following file(s) exceed the 10MB limit: ${oversizedFiles.join(", ")}. Please select smaller files.`
-      );
-    }
-
-    if (newAttachments.length > 0) {
-      onAddAttachments(newAttachments);
-    }
+    if (error) setErrorMessage(error);
+    if (newAttachments.length > 0) onAddAttachments(newAttachments);
 
     // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  };
-
-  const readFileAsDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
   };
 
   return (

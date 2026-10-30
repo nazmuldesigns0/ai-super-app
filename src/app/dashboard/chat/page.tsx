@@ -3,18 +3,24 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { ModelSelector } from "@/components/chat/ModelSelector";
-import { FileUploadButton, AttachmentPreviewList } from "@/components/chat/FileUploadButton";
+import { FileUploadButton, AttachmentPreviewList, filesToAttachments } from "@/components/chat/FileUploadButton";
 import { MessageItem } from "@/components/chat/MessageItem";
 import { AiProgressIndicator } from "@/components/chat/AiProgressIndicator";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ApiKeysModal, getSavedApiKeys } from "@/components/chat/ApiKeysModal";
-import { Send, ArrowDown, Sparkles, MessageSquare, History, PanelLeftClose, PanelLeftOpen, Key } from "lucide-react";
+import { Send, ArrowDown, Sparkles, MessageSquare, History, PanelLeftClose, PanelLeftOpen, Key, Paperclip, AlertCircle } from "lucide-react";
 import type { Message, Attachment, ChatSession } from "@/types";
 import { v4 as uuidv4 } from "uuid";
-import { SUPPORTED_MODELS } from "@/lib/gemini";
+import { SUPPORTED_MODELS } from "@/lib/models";
 import { UNLIMITED_CREDITS } from "@/lib/plans";
 import { authFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+
+/** True only when the drag payload actually contains files (ignores text/selection drags). */
+function isFileDrag(e: React.DragEvent): boolean {
+  const types = e.dataTransfer?.types;
+  return !!types && Array.from(types).includes("Files");
+}
 
 export default function ChatPage() {
   const { user, profile, refreshProfile } = useAuth();
@@ -34,9 +40,53 @@ export default function ChatPage() {
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [keysModalOpen, setKeysModalOpen] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dropError, setDropError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dragDepthRef = useRef<number>(0);
+
+  // Drag & drop file handling onto the chat workspace
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragging(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragging(false);
+    if (isProcessing) return;
+
+    const files = e.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+
+    setDropError(null);
+    const { attachments: newAttachments, error } = await filesToAttachments(files);
+    if (error) setDropError(error);
+    if (newAttachments.length > 0) {
+      setAttachments((prev) => [...prev, ...newAttachments]);
+      textareaRef.current?.focus();
+    }
+  };
 
   // Load chat sessions for current user
   useEffect(() => {
@@ -284,7 +334,24 @@ export default function ChatPage() {
       </div>
 
       {/* Main Chat Workspace */}
-      <div className="flex flex-1 flex-col overflow-hidden bg-background/50">
+      <div
+        className="relative flex flex-1 flex-col overflow-hidden bg-background/50"
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {/* Drag & drop overlay */}
+        {isDragging && (
+          <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/60 bg-primary/10 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-2 rounded-2xl bg-background/90 px-6 py-5 text-center shadow-lg">
+              <Paperclip className="h-6 w-6 text-primary" />
+              <p className="text-sm font-semibold text-foreground">Drop files to attach</p>
+              <p className="text-xs text-muted-foreground">Images, PDFs, docs up to 10MB each</p>
+            </div>
+          </div>
+        )}
+
         {/* Top Control Bar */}
         <div className="flex h-14 items-center justify-between border-b border-border/80 px-4 bg-card/60 backdrop-blur">
           <div className="flex items-center gap-3">
@@ -401,6 +468,20 @@ export default function ChatPage() {
 
         {/* Input Composer Box */}
         <div className="p-3 sm:p-4 bg-card/80 border-t border-border/80 backdrop-blur-md">
+          {dropError && (
+            <div className="mx-auto mb-2 flex max-w-4xl items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive shadow-sm">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div className="flex-1">{dropError}</div>
+              <button
+                type="button"
+                onClick={() => setDropError(null)}
+                className="text-destructive/70 hover:text-destructive"
+                aria-label="Dismiss"
+              >
+                &times;
+              </button>
+            </div>
+          )}
           <div className="relative mx-auto max-w-4xl rounded-2xl border border-border/90 bg-background shadow-sm focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
             {/* Attachment preview tags */}
             <AttachmentPreviewList

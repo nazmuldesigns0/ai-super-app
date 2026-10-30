@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown, Sparkles, Zap, Brain, Swords, Check, Bot } from "lucide-react";
-import { SUPPORTED_MODELS, ModelDefinition, ModelProvider } from "@/lib/gemini";
+import { SUPPORTED_MODELS, ModelDefinition, ModelProvider } from "@/lib/models";
 import { cn } from "@/lib/utils";
 
 interface ModelSelectorProps {

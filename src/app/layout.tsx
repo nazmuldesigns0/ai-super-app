@@ -6,7 +6,7 @@ import { AuthProvider } from "@/components/providers/AuthProvider";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { SITE } from "@/lib/site";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 const socialTitle = `${SITE.name} — ${SITE.tagline}`;
 
