@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/providers/AuthProvider";
+import MemoryManager from "@/components/profile/MemoryManager";
 import { getPlan, formatCredits, UNLIMITED_CREDITS } from "@/lib/plans";
 import { SITE } from "@/lib/site";
 import { cn } from "@/lib/utils";
@@ -84,6 +85,8 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      <MemoryManager />
 
       <div className="glass-panel rounded-2xl p-5 flex items-center gap-3 text-sm">
         <Mail className="h-5 w-5 text-violet-500" />

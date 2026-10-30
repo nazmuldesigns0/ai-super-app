@@ -15,6 +15,7 @@ import { useModels } from "@/hooks/useModels";
 import { openUpgradeModal } from "@/components/billing/UpgradeModal";
 import { UNLIMITED_CREDITS } from "@/lib/plans";
 import { authFetch } from "@/lib/api-client";
+import { notifyOnComplete, prepareNotifications } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
 /** True only when the drag payload actually contains files (ignores text/selection drags). */
@@ -213,6 +214,10 @@ export default function ChatPage() {
     setAttachments([]);
     setIsProcessing(true);
 
+    // Ask for notification permission up-front so we can alert the user when a
+    // long response finishes while the tab is in the background.
+    prepareNotifications();
+
     try {
       // Format history for context window
       const historyPayload = messages.slice(-10).map((m) => ({
@@ -257,6 +262,9 @@ export default function ChatPage() {
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+
+      // If the user switched tabs / minimised while waiting, ping them.
+      notifyOnComplete("Nexora AI", "Your response is ready.");
 
       // Update sessions list locally if new session
       setSessions((prev) => {

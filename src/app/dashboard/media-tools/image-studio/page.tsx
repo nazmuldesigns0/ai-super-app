@@ -12,6 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { authFetch } from "@/lib/api-client";
+import { notifyOnComplete, prepareNotifications } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
 type Mode = "generate" | "edit";
@@ -81,6 +82,7 @@ export default function ImageStudioPage() {
     }
     setLoading(true);
     resetResult();
+    prepareNotifications();
     try {
       const res = await authFetch("/api/image/generate", {
         method: "POST",
@@ -95,6 +97,7 @@ export default function ImageStudioPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Image generation failed.");
       setResult({ ...data, prompt: prompt.trim() });
+      notifyOnComplete("Nexora AI", "Your image is ready.");
     } catch (err: any) {
       setError(err?.message || "Image generation failed.");
     } finally {
@@ -113,6 +116,7 @@ export default function ImageStudioPage() {
     }
     setLoading(true);
     resetResult();
+    prepareNotifications();
     try {
       const res = await authFetch("/api/image/edit", {
         method: "POST",
@@ -127,6 +131,7 @@ export default function ImageStudioPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Image editing failed.");
       setResult({ ...data, prompt: prompt.trim() });
+      notifyOnComplete("Nexora AI", "Your edited image is ready.");
     } catch (err: any) {
       setError(err?.message || "Image editing failed.");
     } finally {

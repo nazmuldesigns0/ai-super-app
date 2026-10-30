@@ -3,6 +3,7 @@
 import React, { useRef, useState } from "react";
 import { Wand2, Download, Loader2, AlertTriangle, RefreshCw, Sparkles } from "lucide-react";
 import { authFetch } from "@/lib/api-client";
+import { notifyOnComplete, prepareNotifications } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -69,6 +70,7 @@ export default function ImageEnhancePage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    prepareNotifications();
     try {
       const res = await authFetch("/api/image/edit", {
         method: "POST",
@@ -78,6 +80,7 @@ export default function ImageEnhancePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Image enhancement failed.");
       setResult(data.image);
+      notifyOnComplete("Nexora AI", "Your enhanced image is ready.");
     } catch (err: any) {
       setError(err?.message || "Image enhancement failed.");
     } finally {
