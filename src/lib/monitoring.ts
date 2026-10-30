@@ -29,6 +29,10 @@ export interface ReportAlertInput {
 const ALERT_THROTTLE_MS = Number(process.env.ALERT_THROTTLE_MS || 5 * 60 * 1000);
 const lastAlertAt = new Map<string, number>();
 
+/** How many alerts to keep in memory when Firestore is not available. */
+const MAX_IN_MEMORY_ALERTS = 50;
+const memoryAlerts: AlertRecord[] = [];
+
 /** Notification channel configuration. */
 export const notificationConfig = {
   webhook: Boolean(process.env.ALERT_WEBHOOK_URL),
@@ -73,6 +77,16 @@ export async function reportAlert(input: ReportAlertInput): Promise<AlertRecord 
   const shouldNotify =
     severity === "recovered" || now - (lastAlertAt.get(throttleKey) || 0) > ALERT_THROTTLE_MS;
 
+  if (shouldNotify) {
+    lastAlertAt.set(throttleKey, now);
+    // Always keep a recent copy in memory so the admin dashboard and
+    // /api/alerts still surface failures when the Admin SDK is not configured.
+    memoryAlerts.unshift(record);
+    if (memoryAlerts.length > MAX_IN_MEMORY_ALERTS) {
+      memoryAlerts.length = MAX_IN_MEMORY_ALERTS;
+    }
+  }
+
   try {
     record.notified = shouldNotify && (await dispatchNotifications(record));
   } catch (err) {
@@ -83,7 +97,6 @@ export async function reportAlert(input: ReportAlertInput): Promise<AlertRecord 
   try {
     const db = adminDb();
     if (db && shouldNotify) {
-      lastAlertAt.set(throttleKey, now);
       await db.collection("systemAlerts").doc(record.id).set(record);
     }
   } catch (err) {
@@ -249,15 +262,21 @@ export async function runProviderHealthCheck(): Promise<ProviderHealthResult[]> 
 export async function getRecentAlerts(limit = 50): Promise<AlertRecord[]> {
   try {
     const db = adminDb();
-    if (!db) return [];
+    if (!db) return memoryAlerts.slice(0, limit);
     const snap = await db
       .collection("systemAlerts")
       .orderBy("createdAt", "desc")
       .limit(limit)
       .get();
-    return snap.docs.map((doc) => doc.data() as AlertRecord);
+    const persisted = snap.docs.map((doc) => doc.data() as AlertRecord);
+    // Merge in-memory alerts (e.g. recorded before the Admin SDK was ready).
+    const byId = new Map<string, AlertRecord>();
+    for (const a of [...memoryAlerts, ...persisted]) byId.set(a.id, a);
+    return Array.from(byId.values())
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
   } catch (err) {
     console.error("[AI Monitor] Could not load alerts:", err);
-    return [];
+    return memoryAlerts.slice(0, limit);
   }
 }
