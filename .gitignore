@@ -36,5 +36,11 @@ next-env.d.ts
 firebase-debug.log
 firestore-debug.log
 
+# firebase admin service account keys — NEVER commit these
+serviceAccountKey.json
+service-account*.json
+firebase-admin*.json
+*firebase-adminsdk*.json
+
 # local scratch files
 tmp_*

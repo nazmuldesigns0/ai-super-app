@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAdminConfigured } from "@/lib/firebase/admin";
 
 export async function GET() {
   const providers = {
@@ -48,7 +49,7 @@ export async function GET() {
     hasApiKey: Boolean(process.env.NEXT_PUBLIC_FIREBASE_API_KEY),
     firestoreConnected: true, // Successfully deployed firestore.rules
     storageStatus: "bucket_initialization_pending", // needs 1-click in console
-    adminSdkConfigured: Boolean(process.env.FIREBASE_ADMIN_PRIVATE_KEY),
+    adminSdkConfigured: isAdminConfigured,
   };
 
   return NextResponse.json({
