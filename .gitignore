@@ -44,3 +44,7 @@ firebase-admin*.json
 
 # local scratch files
 tmp_*
+_tmp_*
+
+# vercel
+.vercel
