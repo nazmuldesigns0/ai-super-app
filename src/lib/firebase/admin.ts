@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 
 let adminApp: App | null = null;
@@ -98,11 +98,21 @@ function getAdminApp(): App | null {
       }),
       storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
-    return adminApp;
   } catch (err) {
     console.warn("Failed to initialize Firebase Admin SDK:", err);
     return null;
   }
+
+  // Configure Firestore before anything can use it. Setting this lazily (on
+  // first adminDb() call) fails whenever another module already touched the
+  // instance, so it must happen here, at app creation time.
+  try {
+    getFirestore(adminApp).settings({ ignoreUndefinedProperties: true });
+  } catch (err) {
+    console.warn("[Firebase Admin] Could not apply Firestore settings:", err);
+  }
+
+  return adminApp;
 }
 
 export const adminAuth = () => {
@@ -110,7 +120,13 @@ export const adminAuth = () => {
   return app ? getAuth(app) : null;
 };
 
-export const adminDb = () => {
+/**
+ * Firestore must be configured before it is used anywhere in the process.
+ * `ignoreUndefinedProperties` is required because profiles legitimately omit
+ * optional fields (e.g. photoURL for email/password sign-ups) — without it,
+ * any write containing `undefined` is rejected.
+ */
+export const adminDb = (): Firestore | null => {
   const app = getAdminApp();
   return app ? getFirestore(app) : null;
 };
