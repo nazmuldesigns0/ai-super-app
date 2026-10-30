@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateGeminiContent, SUPPORTED_MODELS, sanitizeErrorMessage } from "@/lib/gemini";
 import { generateAI } from "@/lib/ai";
 import { reportProviderFailure } from "@/lib/monitoring";
-import { authenticateRequest, resolveUserScope } from "@/lib/server-auth";
+import { authenticateRequest, requireVerifiedEmail, resolveUserScope } from "@/lib/server-auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { adminDb } from "@/lib/firebase/admin";
 import { UNLIMITED_CREDITS } from "@/lib/plans";
 import type { Attachment } from "@/types";
@@ -20,40 +21,6 @@ const RATE_LIMIT_MAX = 30;
 
 /** Rate-limit window in milliseconds (60 seconds) */
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-
-// ── In-memory Rate Limiter ────────────────────────────────────────────────────
-// Simple sliding-window counter keyed by userId (or IP for unauthenticated).
-// For production scale use Upstash Redis instead.
-const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
-
-function checkRateLimit(key: string): { allowed: boolean; retryAfterMs: number } {
-  const now = Date.now();
-  const entry = rateLimitStore.get(key);
-
-  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
-    // New window
-    rateLimitStore.set(key, { count: 1, windowStart: now });
-    return { allowed: true, retryAfterMs: 0 };
-  }
-
-  if (entry.count >= RATE_LIMIT_MAX) {
-    const retryAfterMs = RATE_LIMIT_WINDOW_MS - (now - entry.windowStart);
-    return { allowed: false, retryAfterMs };
-  }
-
-  entry.count += 1;
-  return { allowed: true, retryAfterMs: 0 };
-}
-
-// Periodically clean up expired entries to prevent memory growth
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitStore.entries()) {
-    if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS * 2) {
-      rateLimitStore.delete(key);
-    }
-  }
-}, RATE_LIMIT_WINDOW_MS * 5);
 
 export async function POST(req: NextRequest) {
   try {
@@ -81,24 +48,20 @@ export async function POST(req: NextRequest) {
     const userId = scope.userId;
 
     // ── Rate Limiting ─────────────────────────────────────────────────
-    // Key by userId if authenticated, else fall back to IP
-    const rateLimitKey =
-      userId ||
-      req.headers.get("x-forwarded-for") ||
-      req.headers.get("x-real-ip") ||
-      "anonymous";
-    const { allowed, retryAfterMs } = checkRateLimit(String(rateLimitKey));
-    if (!allowed) {
-      return NextResponse.json(
-        {
-          error: `Rate limit exceeded. You can send up to ${RATE_LIMIT_MAX} requests per minute. Please wait ${Math.ceil(retryAfterMs / 1000)} seconds.`,
-        },
-        {
-          status: 429,
-          headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) },
-        }
-      );
-    }
+    // Burst guard keyed by user id (or IP for unauthenticated callers) so a
+    // runaway client cannot drain the free provider quota.
+    const rateLimited = enforceRateLimit(req, {
+      limit: RATE_LIMIT_MAX,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+      userId,
+      message: `Rate limit exceeded. You can send up to ${RATE_LIMIT_MAX} requests per minute.`,
+    });
+    if (rateLimited) return rateLimited;
+
+    // ── E-mail verification ───────────────────────────────────────────
+    // Password sign-ups must confirm their code before spending AI credits.
+    const unverified = requireVerifiedEmail(auth);
+    if (unverified) return unverified;
 
     // ── Input Validation ──────────────────────────────────────────────
     if (message && typeof message === "string" && message.length > MAX_PROMPT_LENGTH) {

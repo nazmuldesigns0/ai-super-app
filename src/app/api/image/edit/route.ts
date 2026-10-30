@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { editImage } from "@/lib/image";
 import { sanitizeErrorMessage } from "@/lib/gemini";
-import { authenticateRequest } from "@/lib/server-auth";
+import { authenticateRequest, requireVerifiedEmail } from "@/lib/server-auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { reportProviderFailure } from "@/lib/monitoring";
 
 const MAX_PROMPT_LENGTH = 2000;
 /** The source image must be <= 10 MB (data URL length is ~1.37x the bytes). */
 const MAX_IMAGE_DATA_LENGTH = 14 * 1024 * 1024;
+
+/** Image edits allowed per user per minute. */
+const RATE_LIMIT_MAX = 15;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,6 +19,16 @@ export async function POST(req: NextRequest) {
     if (!auth) {
       return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     }
+
+    const rateLimited = enforceRateLimit(req, {
+      limit: RATE_LIMIT_MAX,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+      userId: auth.userId,
+    });
+    if (rateLimited) return rateLimited;
+
+    const unverified = requireVerifiedEmail(auth);
+    if (unverified) return unverified;
 
     const body = await req.json().catch(() => ({}));
     const { prompt, image, steps, negativePrompt } = body || {};

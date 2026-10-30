@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminStorage } from "@/lib/firebase/admin";
-import { authenticateRequest, resolveUserScope } from "@/lib/server-auth";
+import { authenticateRequest, requireVerifiedEmail, resolveUserScope } from "@/lib/server-auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { v4 as uuidv4 } from "uuid";
 
 // 10 MB strict limit
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+/** Uploads allowed per user per minute. */
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 // Server-side MIME allowlist (mirrors storage.rules).
 const ALLOWED_MIME_TYPES = [
@@ -38,6 +43,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: scope.error }, { status: 401 });
     }
     const userId = scope.userId;
+
+    const rateLimited = enforceRateLimit(req, {
+      limit: RATE_LIMIT_MAX,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+      userId,
+    });
+    if (rateLimited) return rateLimited;
+
+    const unverified = requireVerifiedEmail(auth);
+    if (unverified) return unverified;
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });

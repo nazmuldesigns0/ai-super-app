@@ -176,6 +176,14 @@ export default function Home() {
               {SITE.supportEmail}
             </a>
           </p>
+          <nav className="flex items-center gap-4 text-xs text-muted-foreground">
+            <Link href="/privacy" className="font-semibold transition hover:text-foreground">
+              Privacy
+            </Link>
+            <Link href="/terms" className="font-semibold transition hover:text-foreground">
+              Terms
+            </Link>
+          </nav>
           <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} {SITE.name}</p>
         </div>
       </footer>

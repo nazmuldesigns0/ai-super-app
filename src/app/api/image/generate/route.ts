@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateImage, IMAGE_MODELS } from "@/lib/image";
 import { sanitizeErrorMessage } from "@/lib/gemini";
-import { authenticateRequest } from "@/lib/server-auth";
+import { authenticateRequest, requireVerifiedEmail } from "@/lib/server-auth";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { reportProviderFailure } from "@/lib/monitoring";
 
 const MAX_PROMPT_LENGTH = 2000;
+
+/** Image generations allowed per user per minute. */
+const RATE_LIMIT_MAX = 15;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 /** GET /api/image/generate — list available (free) image models. */
 export async function GET() {
@@ -25,6 +30,16 @@ export async function POST(req: NextRequest) {
     if (!auth) {
       return NextResponse.json({ error: "Authentication required." }, { status: 401 });
     }
+
+    const rateLimited = enforceRateLimit(req, {
+      limit: RATE_LIMIT_MAX,
+      windowMs: RATE_LIMIT_WINDOW_MS,
+      userId: auth.userId,
+    });
+    if (rateLimited) return rateLimited;
+
+    const unverified = requireVerifiedEmail(auth);
+    if (unverified) return unverified;
 
     const body = await req.json().catch(() => ({}));
     const { prompt, model, steps, negativePrompt } = body || {};

@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { adminAuth, isAdminConfigured } from "@/lib/firebase/admin";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -111,4 +112,26 @@ export function resolveUserScope(
     return { ok: false, error: "Unauthorized." };
   }
   return { ok: true, userId: auth.userId };
+}
+
+/**
+ * Guards the endpoints that spend AI quota or storage.
+ *
+ * Password sign-ups must confirm the e-mailed code before using the app, and
+ * that rule is only truly enforced here: the dashboard gate is a client-side
+ * convenience that a hand-crafted API call can skip. Google sign-ins arrive
+ * with `email_verified` already set by Firebase, so they pass automatically,
+ * and admins are always allowed through.
+ *
+ * Returns `null` when the caller may continue.
+ */
+export function requireVerifiedEmail(auth: AuthContext | null): NextResponse | null {
+  if (auth && (auth.emailVerified || auth.isAdmin)) return null;
+  return NextResponse.json(
+    {
+      error: "Please verify your e-mail address before using the AI features.",
+      code: "EMAIL_NOT_VERIFIED",
+    },
+    { status: 403 }
+  );
 }

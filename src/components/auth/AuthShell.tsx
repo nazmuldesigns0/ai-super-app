@@ -54,6 +54,14 @@ export function AuthShell({
         <p className="mt-6 text-center text-xs text-muted-foreground">
           Need help? <a href={`mailto:${SITE.supportEmail}`} className="font-semibold text-violet-500 hover:underline">{SITE.supportEmail}</a>
         </p>
+        <nav className="mt-3 flex items-center justify-center gap-4 text-xs text-muted-foreground">
+          <Link href="/privacy" className="font-semibold transition hover:text-foreground">
+            Privacy
+          </Link>
+          <Link href="/terms" className="font-semibold transition hover:text-foreground">
+            Terms
+          </Link>
+        </nav>
       </div>
     </div>
   );

@@ -8,72 +8,70 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && request.auth.token.admin == true;
     }
-    // isOwner: checks a userId field stored IN the document
+    // isOwner: compares the caller's uid with a userId stored IN the document
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
     // ── Users ─────────────────────────────────────────────────────────
-    // Only the user themselves (or an admin) can read/write their own doc
+    // Account documents are created and updated exclusively by the server
+    // (Admin SDK) during sign-up and login. Clients may only read their own
+    // profile: a user must never be able to grant themselves `role: "admin"`,
+    // extra credits or a higher subscription tier from the browser.
     match /users/{userId} {
-      allow read, write: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false; // Server-side Admin SDK only
     }
 
     // ── Chat Sessions ─────────────────────────────────────────────────
-    // A session is readable/writable only by the user who created it
+    // A session is readable only by the user who owns it.
     match /chatSessions/{sessionId} {
-      allow create: if isAuthenticated()
-                    && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if isAuthenticated()
-                    && resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Server-side Admin SDK only
     }
 
     // ── Chat Messages ─────────────────────────────────────────────────
-    // Scope to messages that belong to sessions owned by current user
-    // (sessionId field stored on each message document)
+    // Readable only when the parent session belongs to the caller.
     match /messages/{messageId} {
-      allow create: if isAuthenticated()
-                    && request.resource.data.sessionId != null;
-      allow read, update, delete: if isAuthenticated()
-                    && exists(/databases/$(database)/documents/chatSessions/$(resource.data.sessionId))
-                    && get(/databases/$(database)/documents/chatSessions/$(resource.data.sessionId)).data.userId == request.auth.uid;
+      allow read: if isAuthenticated()
+                  && resource.data.sessionId != null
+                  && exists(/databases/$(database)/documents/chatSessions/$(resource.data.sessionId))
+                  && get(/databases/$(database)/documents/chatSessions/$(resource.data.sessionId)).data.userId == request.auth.uid;
+      allow write: if false; // Server-side Admin SDK only
     }
 
     // ── Library Files ─────────────────────────────────────────────────
-    // A user can only see/modify their own library files
+    // A user can only read their own library files.
     match /libraryFiles/{fileId} {
-      allow create: if isAuthenticated()
-                    && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if isAuthenticated()
-                    && resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Server-side Admin SDK only
     }
 
     // ── Master Prompts ────────────────────────────────────────────────
-    // Public read, admin-only write
+    // Public read, server-side (admin) writes only.
     match /masterPrompts/{promptId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if false; // Server-side Admin SDK only
+    }
+
+    // ── AI Models ─────────────────────────────────────────────────────
+    // Public read, server-side (admin) writes only.
+    match /aiModels/{modelId} {
+      allow read: if true;
+      allow write: if false; // Server-side Admin SDK only
     }
 
     // ── Credit Transactions ───────────────────────────────────────────
     // Users can read only their own transactions; no client-side writes
-    // (all writes happen via Admin SDK server-side)
+    // (all writes happen via the Admin SDK server-side)
     match /creditTransactions/{txId} {
       allow read: if isAuthenticated()
                   && resource.data.userId == request.auth.uid;
       allow write: if false; // Server-side Admin SDK only
     }
 
-    // ── AI Models ─────────────────────────────────────────────────────
-    // Public read, admin-only write
-    match /aiModels/{modelId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
     // ── Verification Codes ────────────────────────────────────────────
     // E-mail verification codes: never touched from the client.
-    // All reads/writes happen via the Admin SDK server-side.
     match /verificationCodes/{userId} {
       allow read, write: if false; // Server-side Admin SDK only
     }
@@ -82,6 +80,13 @@ service cloud.firestore {
     // Created by the support API (Admin SDK). An admin may read them;
     // users cannot read or write this collection directly.
     match /supportTickets/{ticketId} {
+      allow read: if isAdmin();
+      allow write: if false; // Server-side Admin SDK only
+    }
+
+    // ── Monitoring Alerts ─────────────────────────────────────────────
+    // Written by the monitoring library via the Admin SDK. Admin read only.
+    match /systemAlerts/{alertId} {
       allow read: if isAdmin();
       allow write: if false; // Server-side Admin SDK only
     }

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
@@ -8,9 +8,12 @@ import { SITE } from "@/lib/site";
 
 const inter = Inter({ subsets: ["latin"] });
 
+const socialTitle = `${SITE.name} — ${SITE.tagline}`;
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE.url),
   title: {
-    default: `${SITE.name} — ${SITE.tagline}`,
+    default: socialTitle,
     template: `%s · ${SITE.name}`,
   },
   description: SITE.description,
@@ -21,6 +24,31 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: SITE.name,
   },
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    type: "website",
+    url: SITE.url,
+    siteName: SITE.name,
+    title: socialTitle,
+    description: SITE.description,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: socialTitle,
+    description: SITE.description,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#7c3aed",
 };
 
 export default function RootLayout({
