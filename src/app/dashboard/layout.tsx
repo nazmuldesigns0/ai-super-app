@@ -19,27 +19,29 @@ export default function DashboardLayout({
     if (!loading) {
       if (!user || !isGmail(user.email)) {
         router.replace("/login");
+      } else if (!user.emailVerified) {
+        router.replace("/verify");
       }
     }
   }, [user, loading, router]);
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
+      <div className="aurora-field flex h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <div className="h-9 w-9 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
           <p className="text-sm text-muted-foreground">Loading workspace...</p>
         </div>
       </div>
     );
   }
 
-  if (!user || !isGmail(user.email)) {
+  if (!user || !isGmail(user.email) || !user.emailVerified) {
     return null;
   }
 
   return (
-    <div className="flex h-screen bg-background text-foreground">
+    <div className="aurora-field flex h-screen text-foreground">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />

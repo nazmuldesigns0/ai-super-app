@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     alerts,
     summary: { total: alerts.length, errors: errorCount },
     notifications: notificationConfig,
-    identity: { verified: auth.verified, isDemo: auth.isDemo },
+    identity: { verified: auth.verified, emailVerified: auth.emailVerified, isAdmin: auth.isAdmin },
     fetchedAt: new Date().toISOString(),
   });
 }

@@ -4,6 +4,7 @@ import { generateAI } from "@/lib/ai";
 import { reportProviderFailure } from "@/lib/monitoring";
 import { authenticateRequest, resolveUserScope } from "@/lib/server-auth";
 import { adminDb } from "@/lib/firebase/admin";
+import { UNLIMITED_CREDITS } from "@/lib/plans";
 import type { Attachment } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -149,7 +150,8 @@ export async function POST(req: NextRequest) {
     const sessionId = existingSessionId || uuidv4();
     const db = adminDb();
 
-    // Check credits if authenticated with admin DB
+    // Check credits if authenticated with admin DB.
+    // Admin accounts have no credit limit and are never blocked.
     let currentBalance: number | null = null;
     const modelAConfig = SUPPORTED_MODELS.find((m) => m.id === model) || SUPPORTED_MODELS[0];
     const modelBConfig = SUPPORTED_MODELS.find((m) => m.id === modelB) || SUPPORTED_MODELS[2];
@@ -157,17 +159,21 @@ export async function POST(req: NextRequest) {
       ? modelAConfig.cost + modelBConfig.cost
       : modelAConfig.cost;
 
-    if (db && userId) {
+    if (auth?.isAdmin) {
+      currentBalance = UNLIMITED_CREDITS;
+    } else if (db && userId) {
       try {
         const userRef = db.collection("users").doc(userId);
         const userSnap = await userRef.get();
         if (userSnap.exists) {
           const userData = userSnap.data();
           currentBalance = userData?.creditBalance ?? 0;
-          if (currentBalance !== null && currentBalance < totalCost) {
+          if (currentBalance === UNLIMITED_CREDITS) {
+            // Unlimited account.
+          } else if (currentBalance !== null && currentBalance < totalCost) {
             return NextResponse.json(
               {
-                error: `Insufficient credits. You need ${totalCost} credits, but you have ${currentBalance}.`,
+                error: `Insufficient credits. You need ${totalCost} credits, but you have ${currentBalance}. Upgrade your package to continue.`,
                 creditBalance: currentBalance,
               },
               { status: 403 }
@@ -178,6 +184,14 @@ export async function POST(req: NextRequest) {
         console.warn("Could not check user credits from Firestore:", err);
       }
     }
+
+    // Balance to report back to the client (admins stay unlimited).
+    const nextBalance =
+      currentBalance === UNLIMITED_CREDITS
+        ? UNLIMITED_CREDITS
+        : currentBalance !== null
+          ? Math.max(0, currentBalance - totalCost)
+          : undefined;
 
     // Call Model A
     const promptText = message || "Please analyze the uploaded document/image in detail.";
@@ -284,6 +298,7 @@ export async function POST(req: NextRequest) {
       tokensA: output.tokensUsed,
       cost: totalCost,
       isArena: false,
+      skipCreditDeduction: auth?.isAdmin ?? false,
     });
 
     return NextResponse.json({
@@ -293,8 +308,7 @@ export async function POST(req: NextRequest) {
       model: output.modelUsed,
       tokensUsed: output.tokensUsed || 0,
       cost: totalCost,
-      creditBalance:
-        currentBalance !== null ? Math.max(0, currentBalance - totalCost) : undefined,
+      creditBalance: nextBalance,
     });
   } catch (error: any) {
     console.error("API /api/chat error:", error);
@@ -324,8 +338,10 @@ async function persistChatAndCredits(opts: {
   contentB?: string;
   cost: number;
   isArena: boolean;
+  /** Admin accounts never have credits deducted. */
+  skipCreditDeduction?: boolean;
 }) {
-  const { db, userId, sessionId, prompt, attachments, modelA, contentA, tokensA, modelB, contentB, cost, isArena } = opts;
+  const { db, userId, sessionId, prompt, attachments, modelA, contentA, tokensA, modelB, contentB, cost, isArena, skipCreditDeduction } = opts;
   if (!db || !userId) return;
 
   const now = new Date().toISOString();
@@ -401,21 +417,24 @@ async function persistChatAndCredits(opts: {
     const userSnap = await userRef.get();
     if (userSnap.exists) {
       const current = userSnap.data()?.creditBalance ?? 100;
-      batch.update(userRef, {
-        creditBalance: Math.max(0, current - cost),
-        updatedAt: now,
-      });
+      const unlimited = current === UNLIMITED_CREDITS;
+      if (!unlimited && !skipCreditDeduction) {
+        batch.update(userRef, {
+          creditBalance: Math.max(0, current - cost),
+          updatedAt: now,
+        });
 
-      const txRef = db.collection("creditTransactions").doc(uuidv4());
-      batch.set(txRef, {
-        id: txRef.id,
-        userId,
-        amount: -cost,
-        type: "usage",
-        description: `Chat request with ${modelA}${isArena ? ` vs ${modelB}` : ""}`,
-        metadata: { sessionId, isArena, modelA, modelB },
-        createdAt: now,
-      });
+        const txRef = db.collection("creditTransactions").doc(uuidv4());
+        batch.set(txRef, {
+          id: txRef.id,
+          userId,
+          amount: -cost,
+          type: "usage",
+          description: `Chat request with ${modelA}${isArena ? ` vs ${modelB}` : ""}`,
+          metadata: { sessionId, isArena, modelA, modelB },
+          createdAt: now,
+        });
+      }
     }
 
     await batch.commit();

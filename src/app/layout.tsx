@@ -3,17 +3,23 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { SupportWidget } from "@/components/support/SupportWidget";
+import { SITE } from "@/lib/site";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "AI Super Workspace",
-  description: "All-in-One AI Super App & Workspace",
+  title: {
+    default: `${SITE.name} — ${SITE.tagline}`,
+    template: `%s · ${SITE.name}`,
+  },
+  description: SITE.description,
+  applicationName: SITE.name,
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "AI Super App",
+    title: SITE.name,
   },
 };
 
@@ -31,7 +37,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            {children}
+            <SupportWidget />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

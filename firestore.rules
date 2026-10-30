@@ -70,5 +70,20 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // ── Verification Codes ────────────────────────────────────────────
+    // E-mail verification codes: never touched from the client.
+    // All reads/writes happen via the Admin SDK server-side.
+    match /verificationCodes/{userId} {
+      allow read, write: if false; // Server-side Admin SDK only
+    }
+
+    // ── Support Tickets ───────────────────────────────────────────────
+    // Created by the support API (Admin SDK). An admin may read them;
+    // users cannot read or write this collection directly.
+    match /supportTickets/{ticketId} {
+      allow read: if isAdmin();
+      allow write: if false; // Server-side Admin SDK only
+    }
   }
 }

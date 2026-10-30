@@ -1,24 +1,15 @@
 import type { NextRequest } from "next/server";
 import { adminAuth, isAdminConfigured } from "@/lib/firebase/admin";
-
-/** UID used by the built-in demo/sandbox session. */
-export const DEMO_UID = "demo-admin-uid-123";
-
-/**
- * Demo mode keeps the app usable without a real Firebase session (local dev,
- * preview, the "demo@gmail.com" login). It can be disabled in production by
- * setting DEMO_MODE_ALLOWED=false.
- */
-export const isDemoModeAllowed = process.env.DEMO_MODE_ALLOWED !== "false";
+import { isAdminEmail } from "@/lib/admin-config";
 
 export interface AuthContext {
   /** The user id the request is allowed to act as. Always server-derived. */
   userId: string;
   email?: string;
-  /** True when a Firebase ID token was present and verified. */
+  /** True when a Firebase ID token was present and verified server-side. */
   verified: boolean;
-  /** True for the shared demo session (unverified). */
-  isDemo: boolean;
+  /** The email address on the token has been verified by Firebase. */
+  emailVerified: boolean;
   isAdmin: boolean;
 }
 
@@ -29,7 +20,7 @@ export interface AuthContext {
  */
 function decodeUnverifiedJwt(
   token: string
-): { uid?: string; email?: string } | null {
+): { uid?: string; email?: string; emailVerified?: boolean } | null {
   try {
     const payloadPart = token.split(".")[1];
     if (!payloadPart) return null;
@@ -38,7 +29,11 @@ function decodeUnverifiedJwt(
       "base64"
     ).toString("utf8");
     const payload = JSON.parse(json);
-    return { uid: payload.user_id || payload.sub, email: payload.email };
+    return {
+      uid: payload.user_id || payload.sub,
+      email: payload.email,
+      emailVerified: payload.email_verified === true,
+    };
   } catch {
     return null;
   }
@@ -47,13 +42,13 @@ function decodeUnverifiedJwt(
 /**
  * Resolves the caller's identity from a Firebase ID token.
  *
- * Resolution order:
  *  1. `Authorization: Bearer <idToken>` -> verified with the Admin SDK.
  *  2. Token present but Admin SDK not configured -> unverified decode, dev only.
- *  3. No token -> demo/anonymous fallback, only when demo mode is allowed.
+ *  3. No token -> `null` (every protected API requires authentication).
  *
- * Returns `null` when the request must be rejected (bad token, or no token and
- * demo mode disabled).
+ * Admins are recognised both from the `admin` custom claim and from the
+ * server-side ADMIN_EMAILS allow-list, so the owner accounts keep admin access
+ * even before their token has been refreshed with the claim.
  */
 export async function authenticateRequest(
   req: NextRequest
@@ -63,61 +58,47 @@ export async function authenticateRequest(
     ? header.slice(7).trim()
     : "";
 
-  if (token) {
-    const auth = adminAuth();
-    if (auth) {
-      try {
-        const decoded = await auth.verifyIdToken(token);
-        return {
-          userId: decoded.uid,
-          email: decoded.email,
-          verified: true,
-          isDemo: decoded.uid === DEMO_UID,
-          isAdmin: decoded.admin === true,
-        };
-      } catch {
-        // Invalid/expired token must never fall through to demo access.
-        return null;
-      }
-    }
+  if (!token) return null;
 
-    // Admin SDK genuinely not configured: allow an unverified decode in dev so
-    // local development keeps working. Never allowed in production.
-    if (isAdminConfigured || process.env.NODE_ENV === "production") {
-      return null;
-    }
-    const decoded = decodeUnverifiedJwt(token);
-    if (decoded?.uid) {
+  const auth = adminAuth();
+  if (auth) {
+    try {
+      const decoded = await auth.verifyIdToken(token);
       return {
         userId: decoded.uid,
         email: decoded.email,
-        verified: false,
-        isDemo: decoded.uid === DEMO_UID,
-        isAdmin: false,
+        verified: true,
+        emailVerified: decoded.email_verified === true,
+        isAdmin: decoded.admin === true || isAdminEmail(decoded.email),
       };
+    } catch {
+      // Invalid/expired tokens are always rejected.
+      return null;
     }
-    return null;
   }
 
-  if (!isDemoModeAllowed) {
+  // Admin SDK genuinely not configured: allow an unverified decode in dev so
+  // local development keeps working. Never allowed in production.
+  if (isAdminConfigured || process.env.NODE_ENV === "production") {
     return null;
   }
-
-  return {
-    userId: DEMO_UID,
-    email: "demo@gmail.com",
-    verified: false,
-    isDemo: true,
-    isAdmin: true,
-  };
+  const decoded = decodeUnverifiedJwt(token);
+  if (decoded?.uid) {
+    return {
+      userId: decoded.uid,
+      email: decoded.email,
+      verified: false,
+      emailVerified: decoded.emailVerified === true,
+      isAdmin: isAdminEmail(decoded.email),
+    };
+  }
+  return null;
 }
 
 /**
  * Returns the effective user id for a data operation, or an error string when
- * the request is not authorized.
- *
- * Verified callers are always scoped to their token UID. Unverified (demo)
- * callers may only act as the demo UID; any other claimed id is rejected.
+ * the request is not authorized. Verified callers are always scoped to their
+ * token UID; a client can never act as another account.
  */
 export function resolveUserScope(
   auth: AuthContext | null,
@@ -125,9 +106,6 @@ export function resolveUserScope(
 ): { ok: true; userId: string } | { ok: false; error: string } {
   if (!auth) {
     return { ok: false, error: "Authentication required." };
-  }
-  if (auth.verified) {
-    return { ok: true, userId: auth.userId };
   }
   if (claimedUserId && claimedUserId !== auth.userId) {
     return { ok: false, error: "Unauthorized." };

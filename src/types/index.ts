@@ -1,5 +1,6 @@
 export type UserRole = "user" | "admin";
-export type SubscriptionTier = "free" | "pro" | "enterprise";
+/** Paid packages, cheapest first: BDT 0 / BDT 300 / BDT 800. */
+export type SubscriptionTier = "starter" | "creator" | "studio";
 
 export interface UserProfile {
   uid: string;

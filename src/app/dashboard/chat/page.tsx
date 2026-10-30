@@ -12,6 +12,7 @@ import { Send, ArrowDown, Sparkles, MessageSquare, History, PanelLeftClose, Pane
 import type { Message, Attachment, ChatSession } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { SUPPORTED_MODELS } from "@/lib/gemini";
+import { UNLIMITED_CREDITS } from "@/lib/plans";
 import { authFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
@@ -131,13 +132,13 @@ export default function ChatPage() {
     const trimmedInput = input.trim();
     if ((!trimmedInput && attachments.length === 0) || isProcessing) return;
 
-    // Check credits client-side
+    // Check credits client-side (admins / unlimited accounts are exempt)
     const currentCredits = profile?.creditBalance ?? 100;
     const modelAConfig = SUPPORTED_MODELS.find((m) => m.id === model) || SUPPORTED_MODELS[0];
     const modelBConfig = SUPPORTED_MODELS.find((m) => m.id === modelB) || SUPPORTED_MODELS[2];
     const totalCost = isArenaMode ? modelAConfig.cost + modelBConfig.cost : modelAConfig.cost;
 
-    if (currentCredits < totalCost) {
+    if (currentCredits !== UNLIMITED_CREDITS && currentCredits < totalCost) {
       alert(`Insufficient credits! You need ${totalCost} credits, but currently have ${currentCredits}.`);
       return;
     }

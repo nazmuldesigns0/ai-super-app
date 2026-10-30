@@ -1,11 +1,11 @@
 {
-  "name": "AI Super Workspace",
-  "short_name": "AI Super App",
-  "description": "All-in-One AI Super App & Workspace",
+  "name": "Nexora AI — Create • Chat • Imagine",
+  "short_name": "Nexora AI",
+  "description": "Nexora AI is an all-in-one studio for AI chat, image generation, image editing and creative media tools.",
   "start_url": "/",
-  "display": "fullscreen",
-  "background_color": "#09090b",
-  "theme_color": "#09090b",
+  "display": "standalone",
+  "background_color": "#120a2a",
+  "theme_color": "#7c3aed",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -16,4 +16,3 @@
     }
   ]
 }
-
