@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { editImage } from "@/lib/image";
 import { generateAI } from "@/lib/ai";
 import { sanitizeErrorMessage } from "@/lib/gemini";
+import { DEFAULT_MODEL_ID } from "@/lib/models";
 import { authenticateRequest, requireVerifiedEmail } from "@/lib/server-auth";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { reportProviderFailure } from "@/lib/monitoring";
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
     let finalPrompt = prompt;
     try {
       const visionResult = await generateAI({
-        model: "gemini-2.0-flash",
+        model: DEFAULT_MODEL_ID,
         prompt: `Analyze this image and provide a concise, highly detailed technical description of the main subject (person/object), their specific features, colors, and the environment. Focus on identifying markers that MUST remain identical (e.g., age, gender, facial structure, specific clothing colors). Then, output only a comma-separated list of these descriptive tags.`,
         attachments: [{ 
           data: image, 

@@ -8,6 +8,7 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 import { adminDb } from "@/lib/firebase/admin";
 import { UNLIMITED_CREDITS } from "@/lib/plans";
 import { chargeCredits } from "@/lib/credits";
+import { DEFAULT_ARENA_MODEL_ID, DEFAULT_MODEL_ID } from "@/lib/models";
 import type { Attachment } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -29,13 +30,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       message,
-      model = "gemini-2.0-flash",
+      model = DEFAULT_MODEL_ID,
       sessionId: existingSessionId,
       userId: requestedUserId,
       history = [],
       attachments = [],
       isArenaMode = false,
-      modelB = "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      modelB = DEFAULT_ARENA_MODEL_ID,
       customApiKeys = {},
     } = body;
 
@@ -124,8 +125,20 @@ export async function POST(req: NextRequest) {
     // billed and routed correctly. Falls back to the built-in list.
     const catalog = await getEnabledModels();
     registerRuntimeModels(catalog);
-    const modelAConfig = catalog.find((m) => m.id === model) || catalog[0];
-    const modelBConfig = catalog.find((m) => m.id === modelB) || catalog[2] || catalog[0];
+    const modelAConfig =
+      catalog.find((m) => m.id === model) ||
+      catalog.find((m) => m.id === DEFAULT_MODEL_ID) ||
+      catalog[0];
+    const modelBConfig =
+      catalog.find((m) => m.id === modelB) ||
+      catalog.find((m) => m.id === DEFAULT_ARENA_MODEL_ID) ||
+      catalog[1] ||
+      catalog[0];
+    if (!modelAConfig || !modelBConfig) {
+      return NextResponse.json({ error: "No AI models are currently enabled." }, { status: 503 });
+    }
+    const resolvedModel = modelAConfig.id;
+    const resolvedModelB = modelBConfig.id;
     const totalCost = isArenaMode
       ? modelAConfig.cost + modelBConfig.cost
       : modelAConfig.cost;
@@ -186,14 +199,14 @@ export async function POST(req: NextRequest) {
       // Arena mode: Run Model A and Model B concurrently
       const [resA, resB] = await Promise.allSettled([
         generateGeminiContent({
-          model,
+          model: resolvedModel,
           prompt: promptText,
           history,
           attachments,
           customApiKey: getProviderKey(modelAConfig.provider),
         }),
         generateGeminiContent({
-          model: modelB,
+          model: resolvedModelB,
           prompt: promptText,
           history,
           attachments,
@@ -206,13 +219,13 @@ export async function POST(req: NextRequest) {
           ? resA.value
           : (reportProviderFailure(
               modelAConfig.provider,
-              model,
+              resolvedModel,
               (resA as PromiseRejectedResult).reason,
               userId
             ),
             {
-              text: `[${model} Error: ${(resA as PromiseRejectedResult).reason?.message || "Generation failed"}]`,
-              modelUsed: model,
+              text: `[${resolvedModel} Error: ${(resA as PromiseRejectedResult).reason?.message || "Generation failed"}]`,
+              modelUsed: resolvedModel,
               tokensUsed: 0,
             });
 
@@ -221,13 +234,13 @@ export async function POST(req: NextRequest) {
           ? resB.value
           : (reportProviderFailure(
               modelBConfig.provider,
-              modelB,
+              resolvedModelB,
               (resB as PromiseRejectedResult).reason,
               userId
             ),
             {
-              text: `[${modelB} Error: ${(resB as PromiseRejectedResult).reason?.message || "Generation failed"}]`,
-              modelUsed: modelB,
+              text: `[${resolvedModelB} Error: ${(resB as PromiseRejectedResult).reason?.message || "Generation failed"}]`,
+              modelUsed: resolvedModelB,
               tokensUsed: 0,
             });
 
@@ -265,7 +278,7 @@ export async function POST(req: NextRequest) {
 
     // Standard Single-Model Mode (with automatic provider failover)
     const output = await generateAI({
-      model,
+      model: resolvedModel,
       prompt: promptText,
       history,
       attachments,

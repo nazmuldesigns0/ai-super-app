@@ -3,7 +3,7 @@ import type { Attachment } from "@/types";
 
 // Model catalogue lives in a client-safe module so client components can read
 // it without pulling the `@google/genai` SDK into the browser bundle.
-import { SUPPORTED_MODELS, type ModelDefinition } from "@/lib/models";
+import { DEFAULT_MODEL_ID, SUPPORTED_MODELS, type ModelDefinition } from "@/lib/models";
 
 export { SUPPORTED_MODELS };
 export type { ModelDefinition, ModelProvider } from "@/lib/models";
@@ -61,7 +61,7 @@ export function detectBestModelForPrompt(
   // 1. If files/images attached -> Gemini is best for multimodal 1M context
   if (hasAttachments) {
     return {
-      targetModel: "gemini-2.0-flash",
+      targetModel: DEFAULT_MODEL_ID,
       reason: "Multimodal Vision & Document Processing",
     };
   }
@@ -108,7 +108,7 @@ export function detectBestModelForPrompt(
 export async function generateContentUniversal(
   options: GenerateModelOptions
 ): Promise<GenerateModelResult> {
-  const modelId = options.model || "auto-router";
+  const modelId = options.model || DEFAULT_MODEL_ID;
 
   // Handle Autonomous Smart Router
   if (modelId === "auto-router") {
@@ -122,7 +122,7 @@ export async function generateContentUniversal(
       primaryTarget,
       "qwen/qwen3.8-27b",
       "@cf/meta/llama-3.1-8b-instruct",
-      "gemini-2.0-flash",
+      DEFAULT_MODEL_ID,
     ];
 
     const uniqueCandidates = Array.from(new Set(fallbackCandidates));
@@ -219,8 +219,8 @@ async function callGoogleGemini(
   }
 
   const modelToCall =
-    modelId === "gemini-3.8-flash" || modelId === "gemini-1.5-flash"
-      ? "gemini-2.0-flash"
+    modelId === "gemini-1.5-flash"
+      ? DEFAULT_MODEL_ID
       : modelId;
 
   // Primary: official GoogleGenAI SDK

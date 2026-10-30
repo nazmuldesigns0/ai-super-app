@@ -4,6 +4,7 @@ import {
   type GenerateModelOptions,
   type GenerateModelResult,
 } from "@/lib/gemini";
+import { DEFAULT_MODEL_ID } from "@/lib/models";
 import { reportProviderFailure } from "@/lib/monitoring";
 
 /**
@@ -12,10 +13,10 @@ import { reportProviderFailure } from "@/lib/monitoring";
  * the user as a hard error.
  */
 const FALLBACK_MODELS = [
+  DEFAULT_MODEL_ID,
+  "gemini-1.5-flash-8b",
   "qwen/qwen3.8-27b",
   "@cf/meta/llama-3.1-8b-instruct",
-  "gemini-3.8-flash",
-  "ministral-8b-latest",
 ];
 
 function providerOf(modelId: string): string {
@@ -33,7 +34,7 @@ function providerOf(modelId: string): string {
 export async function generateAI(
   options: GenerateModelOptions
 ): Promise<GenerateModelResult> {
-  const requested = options.model || "auto-router";
+  const requested = options.model || DEFAULT_MODEL_ID;
 
   try {
     return await generateContentUniversal(options);

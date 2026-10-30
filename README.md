@@ -35,12 +35,14 @@ An all-in-one AI workspace combining the core ideas of Genspark, iLovePDF, Cutou
 | Provider | Models |
 |---|---|
 | **Auto** | Smart Router (classifies the prompt and routes it) |
-| **Google** | `gemini-3.8-flash`, `gemini-3.5-flash-lite` |
+| **Google** | `gemini-2.0-flash`, `gemini-1.5-flash-8b` |
 | **Groq** | `qwen/qwen3.8-27b`, `openai/gpt-oss-120b`, `openai/gpt-oss-20b` |
 | **Mistral** | `codestral-latest`, `open-mistral-nemo`, `ministral-8b-latest` |
 | **Cloudflare** | `@cf/meta/llama-3.1-8b-instruct`, `@cf/meta/llama-3.3-70b-instruct-fp8-fast`, `@cf/qwen/qwen2.5-coder-32b-instruct`, `@cf/deepseek-ai/deepseek-r1-distill-qwen-32b` |
 
 > Paid providers (OpenAI, Anthropic, xAI, DeepSeek, OpenRouter, SambaNova, HuggingFace) are intentionally hidden from the UI because they need a funded key. The provider code still supports them — re-add an entry in `src/lib/gemini.ts` once you have a working key.
+
+Gemini 2.0 Flash is the default chat and vision model. Auto Router and other providers remain available as explicit user selections.
 
 ### Free image models
 

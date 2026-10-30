@@ -35,6 +35,10 @@ export interface ModelDefinition {
   isPopular?: boolean;
 }
 
+/** Default chat models used when no model is supplied by the caller. */
+export const DEFAULT_MODEL_ID = "gemini-2.0-flash";
+export const DEFAULT_ARENA_MODEL_ID = "gemini-1.5-flash-8b";
+
 export const SUPPORTED_MODELS: ModelDefinition[] = [
   // Autonomous Smart Router
   {
@@ -50,7 +54,7 @@ export const SUPPORTED_MODELS: ModelDefinition[] = [
 
   // Google Gemini
   {
-    id: "gemini-2.0-flash",
+    id: DEFAULT_MODEL_ID,
     displayName: "Gemini 2.0 Flash",
     provider: "Google",
     badge: "Arena Default",
@@ -60,7 +64,7 @@ export const SUPPORTED_MODELS: ModelDefinition[] = [
     isPopular: true,
   },
   {
-    id: "gemini-1.5-flash-8b",
+    id: DEFAULT_ARENA_MODEL_ID,
     displayName: "Gemini 1.5 Flash-8B",
     provider: "Google",
     badge: "Ultra Fast",

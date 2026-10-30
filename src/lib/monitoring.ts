@@ -1,5 +1,6 @@
 import { adminDb } from "@/lib/firebase/admin";
 import { generateContentUniversal, sanitizeErrorMessage } from "@/lib/gemini";
+import { DEFAULT_MODEL_ID } from "@/lib/models";
 
 // ── Alert model ──────────────────────────────────────────────────────────────
 export type AlertSeverity = "error" | "warning" | "recovered";
@@ -183,7 +184,7 @@ export interface ProviderCheck {
  * working key is added so the dashboard never shows misleading failures.
  */
 export const PROVIDER_CHECKS: ProviderCheck[] = [
-  { provider: "Google", label: "Google Gemini", model: "gemini-3.5-flash-lite", envVar: "GEMINI_API_KEY" },
+  { provider: "Google", label: "Google Gemini", model: DEFAULT_MODEL_ID, envVar: "GEMINI_API_KEY" },
   { provider: "Groq", label: "Groq Cloud", model: "openai/gpt-oss-20b", envVar: "GROQ_API_KEY" },
   { provider: "Mistral", label: "Mistral AI", model: "ministral-8b-latest", envVar: "MISTRAL_API_KEY" },
   { provider: "Cloudflare", label: "Cloudflare Workers AI", model: "@cf/meta/llama-3.1-8b-instruct", envVar: "CLOUDFLARE_API_TOKEN" },

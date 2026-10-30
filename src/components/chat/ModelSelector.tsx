@@ -5,6 +5,7 @@ import { ChevronDown, Sparkles, Zap, Brain, Swords, Check, Bot } from "lucide-re
 import { type ModelProvider } from "@/lib/models";
 import { useModels } from "@/hooks/useModels";
 import { cn } from "@/lib/utils";
+import { DEFAULT_ARENA_MODEL_ID } from "@/lib/models";
 
 interface ModelSelectorProps {
   selectedModel: string;
@@ -21,7 +22,7 @@ export function ModelSelector({
   onSelectModel,
   isArenaMode,
   onToggleArenaMode,
-  modelB = "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  modelB = DEFAULT_ARENA_MODEL_ID,
   onSelectModelB,
   disabled = false,
 }: ModelSelectorProps) {

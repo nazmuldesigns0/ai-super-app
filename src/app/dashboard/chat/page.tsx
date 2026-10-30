@@ -18,6 +18,7 @@ import { UNLIMITED_CREDITS } from "@/lib/plans";
 import { authFetch } from "@/lib/api-client";
 import { notifyOnComplete, prepareNotifications } from "@/lib/notify";
 import { cn } from "@/lib/utils";
+import { DEFAULT_ARENA_MODEL_ID, DEFAULT_MODEL_ID } from "@/lib/models";
 
 /** True only when the drag payload actually contains files (ignores text/selection drags). */
 function isFileDrag(e: React.DragEvent): boolean {
@@ -31,13 +32,28 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
   const urlSessionId = searchParams.get("s");
 
-  // Model & Arena State (Default: Auto Smart Router)
-  const [model, setModel] = useState<string>("auto-router");
-  const [modelB, setModelB] = useState<string>("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+  // Model & Arena State (Gemini is the default provider)
+  const [model, setModel] = useState<string>(DEFAULT_MODEL_ID);
+  const [modelB, setModelB] = useState<string>(DEFAULT_ARENA_MODEL_ID);
   const [isArenaMode, setIsArenaMode] = useState<boolean>(false);
 
   // Admin-managed model catalogue (falls back to the built-in list).
   const models = useModels();
+
+  useEffect(() => {
+    if (models.length === 0) return;
+    if (!models.some((entry) => entry.id === model)) {
+      setModel(models.find((entry) => entry.id === DEFAULT_MODEL_ID)?.id || models[0].id);
+    }
+    if (!models.some((entry) => entry.id === modelB)) {
+      setModelB(
+        models.find((entry) => entry.id === DEFAULT_ARENA_MODEL_ID)?.id ||
+          models.find((entry) => entry.id === DEFAULT_MODEL_ID)?.id ||
+          models[1]?.id ||
+          models[0].id
+      );
+    }
+  }, [models, model, modelB]);
 
   // Chat Data State
   const [sessionId, setSessionId] = useState<string>(urlSessionId || uuidv4());

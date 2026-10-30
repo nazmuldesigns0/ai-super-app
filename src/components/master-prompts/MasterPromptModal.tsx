@@ -19,6 +19,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { authFetch } from "@/lib/api-client";
+import { DEFAULT_MODEL_ID } from "@/lib/models";
 
 interface MasterPromptModalProps {
   prompt: MasterPromptDefinition | null;
@@ -84,7 +85,7 @@ export function MasterPromptModal({ prompt, onClose }: MasterPromptModalProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: compiledPrompt,
-          model: "gemini-2.0-flash",
+          model: DEFAULT_MODEL_ID,
         }),
       });
 
