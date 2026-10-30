@@ -9,6 +9,21 @@
 
 export type ModelProvider = "Auto" | "Google" | "Groq" | "OpenRouter" | "Mistral" | "SambaNova" | "Cloudflare" | "xAI" | "OpenAI" | "Anthropic" | "DeepSeek";
 
+/** Providers a model can be assigned to (used by the Admin Panel form). */
+export const MODEL_PROVIDERS: ModelProvider[] = [
+  "Auto",
+  "Google",
+  "Groq",
+  "Cloudflare",
+  "OpenRouter",
+  "Mistral",
+  "SambaNova",
+  "OpenAI",
+  "Anthropic",
+  "DeepSeek",
+  "xAI",
+];
+
 export interface ModelDefinition {
   id: string;
   displayName: string;

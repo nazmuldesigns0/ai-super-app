@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateGeminiContent, SUPPORTED_MODELS, sanitizeErrorMessage } from "@/lib/gemini";
+import { generateGeminiContent, registerRuntimeModels, sanitizeErrorMessage } from "@/lib/gemini";
+import { getEnabledModels } from "@/lib/model-catalog";
 import { generateAI } from "@/lib/ai";
 import { reportProviderFailure } from "@/lib/monitoring";
 import { authenticateRequest, requireVerifiedEmail, resolveUserScope } from "@/lib/server-auth";
@@ -116,8 +117,14 @@ export async function POST(req: NextRequest) {
     // Check credits if authenticated with admin DB.
     // Admin accounts have no credit limit and are never blocked.
     let currentBalance: number | null = null;
-    const modelAConfig = SUPPORTED_MODELS.find((m) => m.id === model) || SUPPORTED_MODELS[0];
-    const modelBConfig = SUPPORTED_MODELS.find((m) => m.id === modelB) || SUPPORTED_MODELS[2];
+    // ── Model catalogue ───────────────────────────────────────────────
+    // Load the admin-managed catalogue (Firestore `aiModels` merged over the
+    // built-in list) so models added or re-priced in the Admin Panel are
+    // billed and routed correctly. Falls back to the built-in list.
+    const catalog = await getEnabledModels();
+    registerRuntimeModels(catalog);
+    const modelAConfig = catalog.find((m) => m.id === model) || catalog[0];
+    const modelBConfig = catalog.find((m) => m.id === modelB) || catalog[2] || catalog[0];
     const totalCost = isArenaMode
       ? modelAConfig.cost + modelBConfig.cost
       : modelAConfig.cost;

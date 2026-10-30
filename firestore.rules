@@ -61,6 +61,14 @@ service cloud.firestore {
       allow write: if false; // Server-side Admin SDK only
     }
 
+    // ── App Settings ──────────────────────────────────────────────────
+    // Site-wide configuration (e.g. the global announcement). Public read so
+    // the notice can appear before sign-in; server-side (admin) writes only.
+    match /appSettings/{settingId} {
+      allow read: if true;
+      allow write: if false; // Server-side Admin SDK only
+    }
+
     // ── Credit Transactions ───────────────────────────────────────────
     // Users can read only their own transactions; no client-side writes
     // (all writes happen via the Admin SDK server-side)

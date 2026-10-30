@@ -25,7 +25,7 @@ const adminNav = [
   { href: "/admin/usage", label: "Usage", icon: BarChart3, color: "from-cyan-500 to-sky-500" },
   { href: "/admin/models", label: "Models", icon: Cpu, color: "from-emerald-500 to-teal-500" },
   { href: "/admin/alerts", label: "Health & Alerts", icon: Activity, color: "from-amber-500 to-orange-500" },
-  { href: "/admin/broadcast", label: "Broadcast", icon: Megaphone, color: "from-rose-500 to-red-500" },
+  { href: "/admin/broadcast", label: "Announcement", icon: Megaphone, color: "from-rose-500 to-red-500" },
 ];
 
 export default function AdminLayout({

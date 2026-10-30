@@ -3,10 +3,25 @@ import type { Attachment } from "@/types";
 
 // Model catalogue lives in a client-safe module so client components can read
 // it without pulling the `@google/genai` SDK into the browser bundle.
-import { SUPPORTED_MODELS } from "@/lib/models";
+import { SUPPORTED_MODELS, type ModelDefinition } from "@/lib/models";
 
 export { SUPPORTED_MODELS };
 export type { ModelDefinition, ModelProvider } from "@/lib/models";
+
+/**
+ * Models managed from the Admin Panel (loaded from Firestore). When present
+ * they take precedence over the built-in catalogue so admins can add, edit or
+ * disable models without a code change.
+ */
+let runtimeModels: ModelDefinition[] = [];
+
+export function registerRuntimeModels(models: ModelDefinition[]): void {
+  if (Array.isArray(models) && models.length > 0) runtimeModels = models;
+}
+
+function resolveModelDefinition(id: string): ModelDefinition | undefined {
+  return runtimeModels.find((m) => m.id === id) || SUPPORTED_MODELS.find((m) => m.id === id);
+}
 
 export interface GenerateModelOptions {
   model?: string;
@@ -137,7 +152,7 @@ export async function generateContentUniversal(
     throw lastErr || new Error("All Auto Router models failed.");
   }
 
-  const modelDef = SUPPORTED_MODELS.find((m) => m.id === modelId);
+  const modelDef = resolveModelDefinition(modelId);
   const provider = modelDef?.provider || "Google";
 
   try {

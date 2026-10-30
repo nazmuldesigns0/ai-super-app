@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown, Sparkles, Zap, Brain, Swords, Check, Bot } from "lucide-react";
-import { SUPPORTED_MODELS, ModelDefinition, ModelProvider } from "@/lib/models";
+import { type ModelProvider } from "@/lib/models";
+import { useModels } from "@/hooks/useModels";
 import { cn } from "@/lib/utils";
 
 interface ModelSelectorProps {
@@ -29,6 +30,9 @@ export function ModelSelector({
   const refA = useRef<HTMLDivElement>(null);
   const refB = useRef<HTMLDivElement>(null);
 
+  // Models enabled by the admin (falls back to the built-in catalogue).
+  const models = useModels();
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (refA.current && !refA.current.contains(event.target as Node)) {
@@ -42,11 +46,9 @@ export function ModelSelector({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const currentA =
-    SUPPORTED_MODELS.find((m) => m.id === selectedModel) || SUPPORTED_MODELS[0];
+  const currentA = models.find((m) => m.id === selectedModel) || models[0];
   const currentB =
-    SUPPORTED_MODELS.find((m) => m.id === modelB) ||
-    SUPPORTED_MODELS[SUPPORTED_MODELS.length - 1];
+    models.find((m) => m.id === modelB) || models[models.length - 1];
 
   const getProviderColor = (provider: ModelProvider) => {
     switch (provider) {
@@ -77,8 +79,9 @@ export function ModelSelector({
     }
   };
 
-  // Group models by provider with Auto at the top
-  const providers: ModelProvider[] = [
+  // Group models by provider, honouring the preferred order and appending any
+  // provider the admin introduced via a custom model.
+  const preferredOrder: ModelProvider[] = [
     "Auto",
     "Groq",
     "Cloudflare",
@@ -91,6 +94,11 @@ export function ModelSelector({
     "Anthropic",
     "xAI",
   ];
+  const presentProviders = Array.from(new Set(models.map((m) => m.provider)));
+  const providers: ModelProvider[] = [
+    ...preferredOrder.filter((p) => presentProviders.includes(p)),
+    ...presentProviders.filter((p) => !preferredOrder.includes(p)),
+  ];
 
   const renderDropdownList = (
     currentSelectedId: string,
@@ -100,7 +108,7 @@ export function ModelSelector({
     return (
       <div className="max-h-[420px] overflow-y-auto space-y-3 p-1">
         {providers.map((p) => {
-          const modelsInGroup = SUPPORTED_MODELS.filter((m) => m.provider === p);
+          const modelsInGroup = models.filter((m) => m.provider === p);
           if (modelsInGroup.length === 0) return null;
 
           return (

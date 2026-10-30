@@ -11,7 +11,7 @@ import { ApiKeysModal, getSavedApiKeys } from "@/components/chat/ApiKeysModal";
 import { Send, ArrowDown, Sparkles, MessageSquare, History, PanelLeftClose, PanelLeftOpen, Key, Paperclip, AlertCircle } from "lucide-react";
 import type { Message, Attachment, ChatSession } from "@/types";
 import { v4 as uuidv4 } from "uuid";
-import { SUPPORTED_MODELS } from "@/lib/models";
+import { useModels } from "@/hooks/useModels";
 import { UNLIMITED_CREDITS } from "@/lib/plans";
 import { authFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,9 @@ export default function ChatPage() {
   const [model, setModel] = useState<string>("auto-router");
   const [modelB, setModelB] = useState<string>("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
   const [isArenaMode, setIsArenaMode] = useState<boolean>(false);
+
+  // Admin-managed model catalogue (falls back to the built-in list).
+  const models = useModels();
 
   // Chat Data State
   const [sessionId, setSessionId] = useState<string>(() => uuidv4());
@@ -184,8 +187,8 @@ export default function ChatPage() {
 
     // Check credits client-side (admins / unlimited accounts are exempt)
     const currentCredits = profile?.creditBalance ?? 100;
-    const modelAConfig = SUPPORTED_MODELS.find((m) => m.id === model) || SUPPORTED_MODELS[0];
-    const modelBConfig = SUPPORTED_MODELS.find((m) => m.id === modelB) || SUPPORTED_MODELS[2];
+    const modelAConfig = models.find((m) => m.id === model) || models[0];
+    const modelBConfig = models.find((m) => m.id === modelB) || models[models.length - 1];
     const totalCost = isArenaMode ? modelAConfig.cost + modelBConfig.cost : modelAConfig.cost;
 
     if (currentCredits !== UNLIMITED_CREDITS && currentCredits < totalCost) {
@@ -457,7 +460,7 @@ export default function ChatPage() {
                 modelName={
                   isArenaMode
                     ? `${model} vs ${modelB}`
-                    : SUPPORTED_MODELS.find((m) => m.id === model)?.displayName || "Gemini 3.8 Flash"
+                    : models.find((m) => m.id === model)?.displayName || "Gemini 3.8 Flash"
                 }
               />
             </div>

@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { SupportWidget } from "@/components/support/SupportWidget";
+import { AnnouncementPopup } from "@/components/announcement/AnnouncementPopup";
 import { SITE } from "@/lib/site";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
@@ -68,6 +69,7 @@ export default function RootLayout({
           <AuthProvider>
             {children}
             <SupportWidget />
+            <AnnouncementPopup />
           </AuthProvider>
         </ThemeProvider>
       </body>
