@@ -1,13 +1,15 @@
 "use client";
 
 import { useAuth } from "@/components/providers/AuthProvider";
-import { PLANS, UNLIMITED_CREDITS, formatCredits } from "@/lib/plans";
+import { UNLIMITED_CREDITS, formatCredits } from "@/lib/plans";
+import { usePlans } from "@/hooks/usePlans";
 import { SITE } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { Check, Crown, Infinity as InfinityIcon, Sparkles, CreditCard } from "lucide-react";
 
 export default function CreditsPage() {
   const { profile } = useAuth();
+  const plans = usePlans();
   const currentTier = profile?.subscriptionTier ?? "starter";
   const unlimited = profile?.creditBalance === UNLIMITED_CREDITS;
 
@@ -53,7 +55,7 @@ export default function CreditsPage() {
           <div className="rounded-xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 px-4 py-3 text-right">
             <p className="text-xs uppercase tracking-wider text-muted-foreground">Your package</p>
             <p className="text-lg font-bold">
-              {PLANS.find((p) => p.id === currentTier)?.name ?? "Starter"}
+              {plans.find((p) => p.id === currentTier)?.name ?? "Basic"}
             </p>
           </div>
         </div>
@@ -61,7 +63,7 @@ export default function CreditsPage() {
 
       {/* Packages */}
       <div className="grid gap-5 sm:grid-cols-3">
-        {PLANS.map((plan, index) => {
+        {plans.map((plan, index) => {
           const isCurrent = plan.id === currentTier;
           return (
             <div

@@ -13,6 +13,7 @@ import {
   Users,
   BarChart3,
   Cpu,
+  Layers,
   Activity,
   Megaphone,
   ArrowLeft,
@@ -22,6 +23,7 @@ import {
 const adminNav = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, color: "from-violet-500 to-indigo-500" },
   { href: "/admin/users", label: "Users", icon: Users, color: "from-fuchsia-500 to-pink-500" },
+  { href: "/admin/plans", label: "Plans", icon: Layers, color: "from-lime-500 to-green-500" },
   { href: "/admin/usage", label: "Usage", icon: BarChart3, color: "from-cyan-500 to-sky-500" },
   { href: "/admin/models", label: "Models", icon: Cpu, color: "from-emerald-500 to-teal-500" },
   { href: "/admin/alerts", label: "Health & Alerts", icon: Activity, color: "from-amber-500 to-orange-500" },

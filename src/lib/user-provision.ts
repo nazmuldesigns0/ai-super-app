@@ -1,6 +1,7 @@
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { isAdminEmail } from "@/lib/admin-config";
-import { DEFAULT_TIER, TOP_TIER, UNLIMITED_CREDITS, getPlan } from "@/lib/plans";
+import { DEFAULT_TIER, TOP_TIER, UNLIMITED_CREDITS } from "@/lib/plans";
+import { getTierCredits } from "@/lib/plan-config";
 import type { SubscriptionTier, UserProfile } from "@/types";
 
 const CREDIT_CYCLE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -40,11 +41,11 @@ export async function provisionUser(params: {
   const isNewUser = !existing;
   const now = new Date().toISOString();
 
-  const basePlan = getPlan(existing?.subscriptionTier);
   const tier: SubscriptionTier = wantsAdmin ? TOP_TIER : (existing?.subscriptionTier ?? DEFAULT_TIER);
+  // New accounts are granted the tier's (admin-configurable) monthly allowance.
   const creditBalance = wantsAdmin
     ? UNLIMITED_CREDITS
-    : (existing?.creditBalance ?? basePlan.monthlyCredits);
+    : (existing?.creditBalance ?? (await getTierCredits(tier)));
 
   const profile: UserProfile = {
     uid: params.uid,

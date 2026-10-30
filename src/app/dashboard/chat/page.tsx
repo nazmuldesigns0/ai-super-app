@@ -12,6 +12,7 @@ import { Send, ArrowDown, Sparkles, MessageSquare, History, PanelLeftClose, Pane
 import type { Message, Attachment, ChatSession } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { useModels } from "@/hooks/useModels";
+import { openUpgradeModal } from "@/components/billing/UpgradeModal";
 import { UNLIMITED_CREDITS } from "@/lib/plans";
 import { authFetch } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -192,7 +193,7 @@ export default function ChatPage() {
     const totalCost = isArenaMode ? modelAConfig.cost + modelBConfig.cost : modelAConfig.cost;
 
     if (currentCredits !== UNLIMITED_CREDITS && currentCredits < totalCost) {
-      alert(`Insufficient credits! You need ${totalCost} credits, but currently have ${currentCredits}.`);
+      openUpgradeModal();
       return;
     }
 
@@ -238,6 +239,9 @@ export default function ChatPage() {
       const data = await res.json();
 
       if (!res.ok) {
+        if (res.status === 403 && data.code === "INSUFFICIENT_CREDITS") {
+          openUpgradeModal();
+        }
         throw new Error(data.error || "Failed to generate AI response");
       }
 

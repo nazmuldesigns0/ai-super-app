@@ -7,6 +7,7 @@ import { authenticateRequest, requireVerifiedEmail, resolveUserScope } from "@/l
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { adminDb } from "@/lib/firebase/admin";
 import { UNLIMITED_CREDITS } from "@/lib/plans";
+import { chargeCredits } from "@/lib/credits";
 import type { Attachment } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -144,6 +145,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(
               {
                 error: `Insufficient credits. You need ${totalCost} credits, but you have ${currentBalance}. Upgrade your package to continue.`,
+                code: "INSUFFICIENT_CREDITS",
+                cost: totalCost,
                 creditBalance: currentBalance,
               },
               { status: 403 }
@@ -155,13 +158,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Balance to report back to the client (admins stay unlimited).
-    const nextBalance =
-      currentBalance === UNLIMITED_CREDITS
-        ? UNLIMITED_CREDITS
-        : currentBalance !== null
-          ? Math.max(0, currentBalance - totalCost)
-          : undefined;
+    // Atomically settle the credit cost once the response is produced. The
+    // transaction guarantees the stored balance can never go out of sync, even
+    // under concurrent requests.
+    const settleCredits = async (): Promise<number | undefined> => {
+      if (auth?.isAdmin) return UNLIMITED_CREDITS;
+      if (!db || !userId) return undefined;
+      const res = await chargeCredits({
+        db,
+        userId,
+        cost: totalCost,
+        description: `Chat request with ${modelAConfig.id}${isArenaMode ? ` vs ${modelBConfig.id}` : ""}`,
+        metadata: {
+          sessionId,
+          isArena: isArenaMode,
+          modelA: modelAConfig.id,
+          modelB: isArenaMode ? modelBConfig.id : undefined,
+        },
+      });
+      return res.unlimited ? UNLIMITED_CREDITS : res.ok ? res.balance : undefined;
+    };
 
     // Call Model A
     const promptText = message || "Please analyze the uploaded document/image in detail.";
@@ -215,8 +231,8 @@ export async function POST(req: NextRequest) {
               tokensUsed: 0,
             });
 
-      // Background persist & credit deduct
-      await persistChatAndCredits({
+      // Background persist
+      await persistChat({
         db,
         userId,
         sessionId,
@@ -227,9 +243,10 @@ export async function POST(req: NextRequest) {
         tokensA: outputA.tokensUsed,
         modelB: outputB.modelUsed,
         contentB: outputB.text,
-        cost: totalCost,
         isArena: true,
       });
+
+      const settledBalance = await settleCredits();
 
       return NextResponse.json({
         sessionId,
@@ -242,8 +259,7 @@ export async function POST(req: NextRequest) {
           contentB: outputB.text,
         },
         cost: totalCost,
-        creditBalance:
-          currentBalance !== null ? Math.max(0, currentBalance - totalCost) : undefined,
+        creditBalance: settledBalance,
       });
     }
 
@@ -256,8 +272,8 @@ export async function POST(req: NextRequest) {
       customApiKey: getProviderKey(modelAConfig.provider),
     });
 
-    // Background persist & credit deduct
-    await persistChatAndCredits({
+    // Background persist
+    await persistChat({
       db,
       userId,
       sessionId,
@@ -266,10 +282,10 @@ export async function POST(req: NextRequest) {
       modelA: output.modelUsed,
       contentA: output.text,
       tokensA: output.tokensUsed,
-      cost: totalCost,
       isArena: false,
-      skipCreditDeduction: auth?.isAdmin ?? false,
     });
+
+    const settledBalance = await settleCredits();
 
     return NextResponse.json({
       sessionId,
@@ -278,7 +294,7 @@ export async function POST(req: NextRequest) {
       model: output.modelUsed,
       tokensUsed: output.tokensUsed || 0,
       cost: totalCost,
-      creditBalance: nextBalance,
+      creditBalance: settledBalance,
     });
   } catch (error: any) {
     console.error("API /api/chat error:", error);
@@ -293,9 +309,11 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Persists messages, updates user session, logs credit transaction, and registers attachments in Library
+ * Persists the chat session, the user/assistant messages and any uploaded
+ * attachments to the Library. Credit settlement happens separately (see
+ * `settleCredits`) so it can use an atomic transaction.
  */
-async function persistChatAndCredits(opts: {
+async function persistChat(opts: {
   db: FirebaseFirestore.Firestore | null;
   userId?: string;
   sessionId: string;
@@ -306,12 +324,9 @@ async function persistChatAndCredits(opts: {
   tokensA?: number;
   modelB?: string;
   contentB?: string;
-  cost: number;
   isArena: boolean;
-  /** Admin accounts never have credits deducted. */
-  skipCreditDeduction?: boolean;
 }) {
-  const { db, userId, sessionId, prompt, attachments, modelA, contentA, tokensA, modelB, contentB, cost, isArena, skipCreditDeduction } = opts;
+  const { db, userId, sessionId, prompt, attachments, modelA, contentA, tokensA, modelB, contentB, isArena } = opts;
   if (!db || !userId) return;
 
   const now = new Date().toISOString();
@@ -382,30 +397,7 @@ async function persistChatAndCredits(opts: {
       }
     }
 
-    // 5. Deduct credits & record transaction
-    const userRef = db.collection("users").doc(userId);
-    const userSnap = await userRef.get();
-    if (userSnap.exists) {
-      const current = userSnap.data()?.creditBalance ?? 100;
-      const unlimited = current === UNLIMITED_CREDITS;
-      if (!unlimited && !skipCreditDeduction) {
-        batch.update(userRef, {
-          creditBalance: Math.max(0, current - cost),
-          updatedAt: now,
-        });
-
-        const txRef = db.collection("creditTransactions").doc(uuidv4());
-        batch.set(txRef, {
-          id: txRef.id,
-          userId,
-          amount: -cost,
-          type: "usage",
-          description: `Chat request with ${modelA}${isArena ? ` vs ${modelB}` : ""}`,
-          metadata: { sessionId, isArena, modelA, modelB },
-          createdAt: now,
-        });
-      }
-    }
+    // 5. Credit settlement is handled by the caller (atomic transaction).
 
     await batch.commit();
   } catch (err) {

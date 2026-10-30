@@ -4,6 +4,9 @@ import { sanitizeErrorMessage } from "@/lib/gemini";
 import { authenticateRequest, requireVerifiedEmail } from "@/lib/server-auth";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { reportProviderFailure } from "@/lib/monitoring";
+import { adminDb } from "@/lib/firebase/admin";
+import { chargeCredits, getCreditBalance } from "@/lib/credits";
+import { CREDIT_COSTS, UNLIMITED_CREDITS } from "@/lib/plans";
 
 const MAX_PROMPT_LENGTH = 2000;
 
@@ -54,6 +57,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const cost = CREDIT_COSTS.imageGenerate;
+
+    // ── Credit check ──────────────────────────────────────────────────
+    const db = adminDb();
+    const balance = auth.isAdmin ? UNLIMITED_CREDITS : await getCreditBalance(db, auth.userId);
+    if (balance !== null && balance !== UNLIMITED_CREDITS && balance < cost) {
+      return NextResponse.json(
+        {
+          error: `Insufficient credits. Image generation costs ${cost} credits, but you have ${balance}. Upgrade your package to continue.`,
+          code: "INSUFFICIENT_CREDITS",
+          cost,
+          creditBalance: balance,
+        },
+        { status: 403 }
+      );
+    }
+
     const result = await generateImage({
       prompt,
       model,
@@ -62,7 +82,21 @@ export async function POST(req: NextRequest) {
       customToken: req.headers.get("x-cloudflare-token") || undefined,
     });
 
-    return NextResponse.json(result);
+    // Atomically deduct credits (admins are never charged).
+    const charge = await chargeCredits({
+      db,
+      userId: auth.userId,
+      cost,
+      isAdmin: auth.isAdmin,
+      description: `Image generation${model ? ` (${model})` : ""}`,
+      metadata: { kind: "image_generate", model },
+    });
+
+    return NextResponse.json({
+      ...result,
+      cost,
+      creditBalance: charge.unlimited ? UNLIMITED_CREDITS : charge.balance,
+    });
   } catch (error: any) {
     reportProviderFailure("Cloudflare (Image)", "text-to-image", error);
     return NextResponse.json(

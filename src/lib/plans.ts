@@ -17,17 +17,23 @@ export interface Plan {
   ring: string;
 }
 
-/** The three packages offered on the pricing page. */
+/**
+ * The three packages offered on the pricing page.
+ *
+ * `features[0]` is always the monthly-credit line — it is regenerated from
+ * `monthlyCredits` (see lib/plan-config.ts) so the admin can change the credits
+ * without the text going stale.
+ */
 export const PLANS: Plan[] = [
   {
     id: "starter",
-    name: "Starter",
+    name: "Basic",
     priceBdt: 0,
-    priceLabel: "BDT 0",
-    monthlyCredits: 100,
+    priceLabel: "Free",
+    monthlyCredits: 150,
     blurb: "Free forever. Perfect for trying everything out.",
     features: [
-      "100 AI credits every month",
+      "150 AI credits every month",
       "All free chat models",
       "Image Studio (text to image)",
       "30-day creative library",
@@ -38,13 +44,13 @@ export const PLANS: Plan[] = [
   },
   {
     id: "creator",
-    name: "Creator",
+    name: "Pro",
     priceBdt: 300,
     priceLabel: "BDT 300 / month",
-    monthlyCredits: 1500,
+    monthlyCredits: 300,
     blurb: "For everyday creators, students and freelancers.",
     features: [
-      "1,500 AI credits every month",
+      "300 AI credits every month",
       "Every chat model + Auto Smart Router",
       "Image generation and image editing",
       "Chat Arena — two models side by side",
@@ -56,14 +62,14 @@ export const PLANS: Plan[] = [
   },
   {
     id: "studio",
-    name: "Studio Pro",
+    name: "Premium",
     priceBdt: 800,
     priceLabel: "BDT 800 / month",
-    monthlyCredits: 5000,
+    monthlyCredits: 500,
     blurb: "Maximum power for teams and heavy daily use.",
     features: [
-      "5,000 AI credits every month",
-      "Everything in Creator",
+      "500 AI credits every month",
+      "Everything in Pro",
       "Highest quality image models",
       "Background removal & image enhancement",
       "Master Prompt library + priority support",
@@ -76,6 +82,13 @@ export const PLANS: Plan[] = [
 export const DEFAULT_TIER: SubscriptionTier = "starter";
 /** The most expensive package — assigned to admin accounts automatically. */
 export const TOP_TIER: SubscriptionTier = "studio";
+
+/** All tiers, cheapest first (matches the order of PLANS). */
+export const SUBSCRIPTION_TIERS: SubscriptionTier[] = PLANS.map((p) => p.id);
+
+export function isSubscriptionTier(value: unknown): value is SubscriptionTier {
+  return typeof value === "string" && SUBSCRIPTION_TIERS.includes(value as SubscriptionTier);
+}
 
 export function getPlan(tier?: SubscriptionTier | null): Plan {
   return PLANS.find((plan) => plan.id === tier) ?? PLANS[0];
