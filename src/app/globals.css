@@ -58,18 +58,19 @@
 }
 
 @layer components {
-  /* Animated aurora backdrop used on the landing + auth screens. */
+  /* Animated aurora backdrop used on the landing + auth screens.
+     NOTE: this doubles as a page/section wrapper, so it must stay a normal
+     in-flow, interactive element. Only the decorative blobs are inert. */
   .aurora-field {
-    position: absolute;
-    inset: 0;
+    position: relative;
     overflow: hidden;
-    pointer-events: none;
   }
   .aurora-blob {
     position: absolute;
     border-radius: 9999px;
     filter: blur(72px);
     opacity: 0.55;
+    pointer-events: none;
   }
 
   .gradient-text {
