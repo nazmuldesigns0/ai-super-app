@@ -1,0 +1,19 @@
+{
+  "name": "AI Super Workspace",
+  "short_name": "AI Super App",
+  "description": "All-in-One AI Super App & Workspace",
+  "start_url": "/",
+  "display": "fullscreen",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
