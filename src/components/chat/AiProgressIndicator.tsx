@@ -19,37 +19,37 @@ export function AiProgressIndicator({
   const steps = [
     {
       label: hasAttachments
-        ? "Uploading & parsing multimodal documents..."
-        : "Initializing Gemini inference session...",
+        ? "Processing documents..."
+        : "Connecting to AI...",
       icon: FileSearch,
       targetPercent: 32,
     },
     {
-      label: `Reasoning with ${modelName}...`,
+      label: `Generating with ${modelName}...`,
       icon: Brain,
       targetPercent: 64,
     },
     {
-      label: "Synthesizing insights and streaming tokens...",
+      label: "Streaming response...",
       icon: Cpu,
       targetPercent: 88,
     },
     {
-      label: "Finalizing response & formatting structure...",
+      label: "Finishing up...",
       icon: Sparkles,
       targetPercent: 96,
     },
   ];
 
   useEffect(() => {
-    // Dynamic progressive realistic animation
+    // Dynamic progressive realistic animation - FASTER
     const interval = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 95) return 95; // Hold at 95% until server returns
-        const nextVal = prev + Math.floor(Math.random() * 5 + 3);
-        return Math.min(nextVal, 95);
+        if (prev >= 98) return 98; 
+        const nextVal = prev + Math.floor(Math.random() * 10 + 5);
+        return Math.min(nextVal, 98);
       });
-    }, 380);
+    }, 200);
 
     return () => clearInterval(interval);
   }, []);
@@ -103,37 +103,6 @@ export function AiProgressIndicator({
           className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"
           style={{ width: "100%" }}
         />
-      </div>
-
-      {/* Multi-step pipeline breadcrumb */}
-      <div className="mt-3 grid grid-cols-4 gap-1 text-[10px]">
-        {steps.map((s, idx) => {
-          const isDone = idx < currentStepIndex;
-          const isCurrent = idx === currentStepIndex;
-          return (
-            <div
-              key={idx}
-              className={cn(
-                "flex items-center gap-1 truncate transition-colors",
-                isDone && "text-primary font-medium",
-                isCurrent && "text-foreground font-semibold",
-                !isDone && !isCurrent && "text-muted-foreground/50"
-              )}
-            >
-              {isDone ? (
-                <CheckCircle2 className="h-2.5 w-2.5 text-primary shrink-0" />
-              ) : (
-                <span
-                  className={cn(
-                    "h-1.5 w-1.5 rounded-full shrink-0",
-                    isCurrent ? "bg-primary animate-pulse" : "bg-muted-foreground/30"
-                  )}
-                />
-              )}
-              <span className="truncate">Step {idx + 1}</span>
-            </div>
-          );
-        })}
       </div>
     </div>
   );

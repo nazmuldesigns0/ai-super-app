@@ -42,7 +42,9 @@ export default function BackgroundRemovalPage() {
     try {
       // Loaded on demand so the heavy WASM/ONNX runtime never blocks initial page load.
       const { removeBackground } = await import("@imgly/background-removal");
+      
       const blob = await removeBackground(source, {
+        publicPath: "https://static.imgly.com/packages/@imgly/background-removal-data/1.7.0/dist/",
         progress: (key: string, current: number, total: number) => {
           if (total > 0) setProgress(Math.round((current / total) * 100));
         },

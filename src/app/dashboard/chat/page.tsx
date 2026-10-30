@@ -9,6 +9,7 @@ import { AiProgressIndicator } from "@/components/chat/AiProgressIndicator";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ApiKeysModal, getSavedApiKeys } from "@/components/chat/ApiKeysModal";
 import { Send, ArrowDown, Sparkles, MessageSquare, History, PanelLeftClose, PanelLeftOpen, Key, Paperclip, AlertCircle } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Message, Attachment, ChatSession } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { useModels } from "@/hooks/useModels";
@@ -26,6 +27,9 @@ function isFileDrag(e: React.DragEvent): boolean {
 
 export default function ChatPage() {
   const { user, profile, refreshProfile } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlSessionId = searchParams.get("s");
 
   // Model & Arena State (Default: Auto Smart Router)
   const [model, setModel] = useState<string>("auto-router");
@@ -36,7 +40,7 @@ export default function ChatPage() {
   const models = useModels();
 
   // Chat Data State
-  const [sessionId, setSessionId] = useState<string>(() => uuidv4());
+  const [sessionId, setSessionId] = useState<string>(urlSessionId || uuidv4());
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState<string>("");
@@ -95,6 +99,15 @@ export default function ChatPage() {
 
   // Load chat sessions for current user
   useEffect(() => {
+    // If we have a session ID in the URL, load it
+    if (urlSessionId && urlSessionId !== sessionId) {
+      setSessionId(urlSessionId);
+      handleSelectSession(urlSessionId);
+    } else if (!urlSessionId && sessionId) {
+      // Sync initial session ID to URL if not present
+      router.replace(`/dashboard/chat?s=${sessionId}`);
+    }
+
     // Check if coming from Master Prompts runner
     if (typeof window !== "undefined") {
       const initialPrompt = sessionStorage.getItem("ai_super_initial_prompt");
@@ -145,6 +158,7 @@ export default function ChatPage() {
     try {
       setHistoryLoading(true);
       setSessionId(targetSessionId);
+      router.push(`/dashboard/chat?s=${targetSessionId}`);
       const res = await authFetch(`/api/chat/sessions?sessionId=${encodeURIComponent(targetSessionId)}`);
       if (res.ok) {
         const data = await res.json();
@@ -160,7 +174,9 @@ export default function ChatPage() {
   // Start new clean chat
   const handleNewChat = () => {
     if (isProcessing) return;
-    setSessionId(uuidv4());
+    const newId = uuidv4();
+    setSessionId(newId);
+    router.push(`/dashboard/chat?s=${newId}`);
     setMessages([]);
     setInput("");
     setAttachments([]);
@@ -472,7 +488,7 @@ export default function ChatPage() {
                 modelName={
                   isArenaMode
                     ? `${model} vs ${modelB}`
-                    : models.find((m) => m.id === model)?.displayName || "Gemini 3.8 Flash"
+                    : models.find((m) => m.id === model)?.displayName || "Gemini 2.0 Flash"
                 }
               />
             </div>
@@ -549,7 +565,7 @@ export default function ChatPage() {
             </div>
           </div>
           <div className="mt-1.5 text-center text-[11px] text-muted-foreground">
-            Gemini 3.8 Flash multimodal reasoning • Max 10MB upload • 1 credit / request
+            Gemini 2.0 Flash multimodal reasoning • Max 10MB upload • 1 credit / request
           </div>
         </div>
       </div>

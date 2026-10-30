@@ -50,8 +50,8 @@ export const SUPPORTED_MODELS: ModelDefinition[] = [
 
   // Google Gemini
   {
-    id: "gemini-3.8-flash",
-    displayName: "Gemini 3.8 Flash",
+    id: "gemini-2.0-flash",
+    displayName: "Gemini 2.0 Flash",
     provider: "Google",
     badge: "Arena Default",
     cost: 1,
@@ -60,8 +60,8 @@ export const SUPPORTED_MODELS: ModelDefinition[] = [
     isPopular: true,
   },
   {
-    id: "gemini-3.5-flash-lite",
-    displayName: "Gemini 3.5 Flash-Lite",
+    id: "gemini-1.5-flash-8b",
+    displayName: "Gemini 1.5 Flash-8B",
     provider: "Google",
     badge: "Ultra Fast",
     cost: 1,

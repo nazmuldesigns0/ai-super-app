@@ -155,6 +155,7 @@ export interface EditImageOptions {
   image: string; // base64 or data URL of the source image
   model?: string;
   steps?: number;
+  strength?: number;
   negativePrompt?: string;
   customToken?: string;
 }
@@ -174,6 +175,11 @@ export async function editImage(options: EditImageOptions): Promise<GeneratedIma
     new Blob([bytes], { type: "image/png" }),
     "input.png"
   );
+  
+  // Add strength if provided (Cloudflare SDXL img2img supports this)
+  if (options.strength !== undefined) {
+    form.append("strength", options.strength.toString());
+  }
 
   let res: Response;
   try {

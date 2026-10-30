@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { editImage } from "@/lib/image";
+import { generateAI } from "@/lib/ai";
 import { sanitizeErrorMessage } from "@/lib/gemini";
 import { authenticateRequest, requireVerifiedEmail } from "@/lib/server-auth";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -17,6 +18,12 @@ const RATE_LIMIT_MAX = 15;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 export async function POST(req: NextRequest) {
+  const getProviderKey = (provider: string): string | undefined => {
+    if (provider === "Google") return req.headers.get("x-gemini-key") || undefined;
+    if (provider === "Cloudflare") return req.headers.get("x-cloudflare-token") || undefined;
+    return undefined;
+  };
+
   try {
     const auth = await authenticateRequest(req);
     if (!auth) {
@@ -34,7 +41,7 @@ export async function POST(req: NextRequest) {
     if (unverified) return unverified;
 
     const body = await req.json().catch(() => ({}));
-    const { prompt, image, steps, negativePrompt } = body || {};
+    const { prompt, image, steps, strength, negativePrompt } = body || {};
 
     if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
       return NextResponse.json({ error: "A prompt is required." }, { status: 400 });
@@ -57,6 +64,33 @@ export async function POST(req: NextRequest) {
 
     const cost = CREDIT_COSTS.imageEdit;
 
+    // ── AI-Assisted Prompt Engineering ────────────────────────────────
+    // Use Gemini Vision to describe the image so the generative model 
+    // preserves the original subject and features perfectly.
+    let finalPrompt = prompt;
+    try {
+      const visionResult = await generateAI({
+        model: "gemini-2.0-flash",
+        prompt: `Analyze this image and provide a concise, highly detailed technical description of the main subject (person/object), their specific features, colors, and the environment. Focus on identifying markers that MUST remain identical (e.g., age, gender, facial structure, specific clothing colors). Then, output only a comma-separated list of these descriptive tags.`,
+        attachments: [{ 
+          data: image, 
+          type: "image/png", 
+          name: "source.png",
+          url: "", // Not used server-side for inline data
+          size: image.length
+        }],
+        customApiKey: getProviderKey("Google"),
+      });
+
+      if (visionResult?.text) {
+        // Remove the auto-routed header if present
+        const cleanVisionText = visionResult.text.split("\n\n").pop() || "";
+        finalPrompt = `Photorealistic enhancement, ${prompt}. Source image features: ${cleanVisionText}. Preserve subject identity perfectly, high resolution, sharp focus, 8k, professional photography.`;
+      }
+    } catch (err) {
+      console.warn("Gemini vision assistance failed for enhancement, falling back to raw prompt:", err);
+    }
+
     // ── Credit check ──────────────────────────────────────────────────
     const db = adminDb();
     const balance = auth.isAdmin ? UNLIMITED_CREDITS : await getCreditBalance(db, auth.userId);
@@ -73,9 +107,10 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await editImage({
-      prompt,
+      prompt: finalPrompt,
       image,
       steps: typeof steps === "number" ? steps : undefined,
+      strength: typeof strength === "number" ? strength : 0.35, // Low strength preserves the original image
       negativePrompt,
       customToken: req.headers.get("x-cloudflare-token") || undefined,
     });

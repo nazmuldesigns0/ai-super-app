@@ -61,7 +61,7 @@ export function detectBestModelForPrompt(
   // 1. If files/images attached -> Gemini is best for multimodal 1M context
   if (hasAttachments) {
     return {
-      targetModel: "gemini-3.8-flash",
+      targetModel: "gemini-2.0-flash",
       reason: "Multimodal Vision & Document Processing",
     };
   }
@@ -122,7 +122,7 @@ export async function generateContentUniversal(
       primaryTarget,
       "qwen/qwen3.8-27b",
       "@cf/meta/llama-3.1-8b-instruct",
-      "gemini-3.8-flash",
+      "gemini-2.0-flash",
     ];
 
     const uniqueCandidates = Array.from(new Set(fallbackCandidates));
@@ -219,8 +219,8 @@ async function callGoogleGemini(
   }
 
   const modelToCall =
-    modelId === "gemini-2.0-flash" || modelId === "gemini-1.5-flash"
-      ? "gemini-3.8-flash"
+    modelId === "gemini-3.8-flash" || modelId === "gemini-1.5-flash"
+      ? "gemini-2.0-flash"
       : modelId;
 
   // Primary: official GoogleGenAI SDK
